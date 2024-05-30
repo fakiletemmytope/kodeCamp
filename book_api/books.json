@@ -1,0 +1,16 @@
+[
+    {
+        "id": 1,
+        "title": "Things fall apart",
+        "author": "Chinua Achibe",
+        "publication_year": "27-10-1986",
+        "genre": "prose"
+    },
+    {
+        "title": "Modern Biology",
+        "author": "Unknown",
+        "publication_year": "1991",
+        "genre": "Science Book",
+        "id": 2
+    }
+]
