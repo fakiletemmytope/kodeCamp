@@ -38,9 +38,10 @@ def basic_query_params(name:str, category:str, price:float):
 # Return a JSON response with the search results and pagination info.
 
 @app.get('/search')
-def optional_query_parameter(query: str | None = None, page: int | int = 1, size: float | None = None):
+def optional_query_parameter(query: str | None = 'name', page:int | None= 1, size: float | None = 6.8):
     
-    data={}
+    data={'query': query, 'page': page, 'size': size} 
+    
     return JSONResponse(content=data)
     
     
