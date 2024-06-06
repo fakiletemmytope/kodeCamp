@@ -6,10 +6,10 @@ import smtplib
 from email.mime.text import MIMEText
 import random
 import function
+import passwd
 
 app = FastAPI()
-EMAIL_ADDRESS = 'fakiletemitope@gmail.com'
-EMAIL_PASSWORD = '*.Oluwaseyi88.*'
+
 
 def generate_random_code():
     return ''.join([str(random.randint(0, 9)) for _ in range(6)])
