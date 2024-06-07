@@ -1,15 +1,17 @@
 
 from typing import Annotated
 from fastapi import FastAPI, Form, Query, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 import smtplib
 from email.mime.text import MIMEText
 import random
 import function
 import passwd
+import bcrypt
 
 app = FastAPI()
-
+#print(passwd.EMAIL_PASSWORD)
 
 def generate_random_code():
     return ''.join([str(random.randint(0, 9)) for _ in range(6)])
@@ -17,12 +19,14 @@ def generate_random_code():
 def send_email(subject, recipient, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
-    msg['From'] = EMAIL_ADDRESS
+    msg['From'] = passwd.EMAIL_ADDRESS
     msg['To'] = recipient
 
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-        smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-        smtp.send_message(msg)
+    mail = smtplib.SMTP('smtp.gmail.com', 465)    
+    mail.ehlo()
+    mail.starttls()
+    mail.login(passwd.EMAIL_ADDRESS, '3JF8”5@”6')
+    mail.send_message(msg)
 
 
 # 1. Simple Blog Post Creation:
@@ -39,8 +43,8 @@ class BlogPost(BaseModel):
 @app.post('/blog/', response_model=BlogPost, status_code=201)
 async def create_blog(author: str = Form(None), title: str = Form(...), content: str = Form(...)):
     if title is None or content is None:
-        raise HTTPException(status_code=404, detail='Title and Content fields are required')
-    return{"title": title, "content": content, "author": author}
+        raise HTTPException(status_code=400, detail='Title and Content fields are required')
+    return JSONResponse(content={"title": title, "content": content, "author": author})
 
 
 # 2. User Profile Update with Image Upload:
@@ -72,7 +76,7 @@ def user_profile( name: str = Form(...),  email:  EmailStr = Form(...), file: Up
     if file.content_type not in allowed_file_types:
         raise HTTPException(status_code=400, detail="Unsupported file type. Only JPEG and PNG images are allowed")
     
-    return {'name': name, 'email': email, 'file': file.filename}
+    return JSONResponse(content={'name': name, 'email': email, 'file': file.filename})
     
 
  
@@ -113,16 +117,20 @@ class Validate(BaseModel):
 def register(email: EmailStr = Form(...), password: str = Form(..., max_length=15, min_length=8), phone_number: int = Form(None)):
     code = generate_random_code
     body = f'This is the registrattion code: {code}. For verification, send the code and email to "http://127.0.0.1:8000/code_validation" '
-    subject = "Verification Code"
-    send_email(subject, email, body)
+    subject = "Verification Code"  
+    password = "your_password".encode()  # Convert password to bytes
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password, salt)
+    #send_email(subject, email, body)
     code_details = {
         'email': email,
-        'code': code
+        'code': code,
+        'password' : hashed_password
     }
     function.update_file(code_details)    
     return{'message': 'Check you email for the verification code and instruction'}
     
-@app.post('code_validation')
+@app.post('/code_validation')
 def validate(email: EmailStr = Form(...), code: int = Form(...)):
     codes = function.load_file()
     initial_length = len(codes)
@@ -147,34 +155,41 @@ cart = []
 class ProductDetails(BaseModel):
     quantity: int
     product_id: int
-    
-@app.post('/cart')
-def add_item(id: int = Form(...), quantity: int = Form(...)):
-    if id and quantity:
-        product = {'product_id': id, 'quantity': quantity}
-        cart.append(product)
-        return(cart)
-    else:
-        return("no such transaction")
 
-@app.put('/cart/')
-def update_item(id: int = Form(...), quantity: int = Form(...)):
-    if id and quantity:
-        print(id)
-        for product in cart:
-            if product['product_id'] == id:
-                new_quantity = product['quantity'] + quantity
-                product['quantity'] = new_quantity
-                return(cart)
-    else: 
-        return("no such transaction")
+@app.post('/cart', response_model=ProductDetails, status_code=200) 
+def add_item(quantity: int=Form(...), product_id: int =Form(...)):
+    # Validate product_id and quantity
+    if product_id <= 0 or quantity <= 0:
+        raise HTTPException(status_code=400, detail="Invalid product ID or quantity (must be positive integers)")
+        
+    product_details = {
+        'quantity': quantity, 'product_id':product_id
+    }
+    cart.append(product_details)    
+
+    return JSONResponse(content=cart)
+
+@app.put('/cart', response_model=ProductDetails, status_code=200)
+def update_item(product_id: int = Form(...), quantity: int = Form(...)):
+      
+
+    if product_id <= 0 or quantity <= 0:         
+        raise HTTPException(status_code=400, detail="Invalid product ID or quantity (must be positive integers)")
+        
+    for product in cart:
+        if product['product_id'] == product_id:
+            product['quantity'] = quantity
+            return JSONResponse(content=cart)
+    raise HTTPException(status_code=404, detail="No product id found")       
     
-@app.delete('/cart/')
+    
+   
+@app.delete('/cart')
 def delete_item(id: int):
-    if id:
+    if id >= 1:
         for product in cart:
             if product['product_id'] == id:
                 cart.remove(product)
-                return(cart)
-    else:
-        return("no such transaction")
+                return JSONResponse(content=cart)
+    
+    raise HTTPException(status_code=404, detail="Product not found")
