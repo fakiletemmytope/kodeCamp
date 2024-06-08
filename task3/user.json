@@ -1,0 +1,32 @@
+[
+    {
+        "email": "fakiletemitope2@gmail.com",
+        "isActivated": true,
+        "password": "$2b$12$95k3MImayVJ2O.OSUEjrtuhd5Nbqtf5Acg8VhwJdWlBblQk1s6WjS",
+        "phone_number": null
+    },
+    {
+        "email": "fakiletemitope2@gmail.com",
+        "isActivated": false,
+        "password": "$2b$12$.aNmpvwE5.AGGagfSnC87OcU8qwfKG77Os3K/8T/jTFBrMCDP6vSG",
+        "phone_number": null
+    },
+    {
+        "email": "fakiletemitope2@gmail.com",
+        "isActivated": false,
+        "password": "$2b$12$5l2zFf/mgCwBo49PkiarLeWSUI5I74dKLJaKBM1L/BrNmxodf.uIS",
+        "phone_number": null
+    },
+    {
+        "email": "fakiletemitope2@gmail.com",
+        "isActivated": false,
+        "password": "$2b$12$mFy.I5ACmwKKMnPivlYRheTVZMnQ.O8cIXaoJSxIRX6uhra7MnaRK",
+        "phone_number": null
+    },
+    {
+        "email": "fakiletemitope2@gmail.com",
+        "isActivated": false,
+        "password": "$2b$12$7Fdvf4/w.Q.ZzGkYrZ4GNeUpvB0JxdGp.OpB8hQ0STFzWtP.cgc4q",
+        "phone_number": null
+    }
+]
