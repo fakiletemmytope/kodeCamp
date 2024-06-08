@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr
 import smtplib
 from email.mime.text import MIMEText
 import random
-import function
+from function import load_file, update_file, delete, load_users, update_user, activate_user
 import passwd
 import bcrypt
 
@@ -21,13 +21,21 @@ def send_email(subject, recipient, body):
     msg['Subject'] = subject
     msg['From'] = passwd.EMAIL_ADDRESS
     msg['To'] = recipient
-
-    mail = smtplib.SMTP('smtp.gmail.com', 465)    
-    mail.ehlo()
-    mail.starttls()
-    mail.login(passwd.EMAIL_ADDRESS, '3JF8”5@”6')
-    mail.send_message(msg)
-
+    try:
+        mail = smtplib.SMTP('smtp.gmail.com', 465)    
+        mail.ehlo()
+        mail.starttls()
+        mail.login(passwd.EMAIL_ADDRESS, passwd.EMAIL_PASSWORD)
+        mail.send_message(msg)
+        return True
+    except Exception as e:
+        return (f"Error sending email: {e}")
+def hashpw(passwd):
+    password = passwd.encode('utf-8')  # Convert password to bytes
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password, salt)
+    print(hashed_password)
+    return hashed_password
 
 # 1. Simple Blog Post Creation:
 # Create an API endpoint that accepts a POST request with form data for blog post title, content, and author (optional).
@@ -115,32 +123,52 @@ class Validate(BaseModel):
     
 @app.post('/register', response_model=Registration, status_code=201)
 def register(email: EmailStr = Form(...), password: str = Form(..., max_length=15, min_length=8), phone_number: int = Form(None)):
-    code = generate_random_code
+    code = generate_random_code()
     body = f'This is the registrattion code: {code}. For verification, send the code and email to "http://127.0.0.1:8000/code_validation" '
     subject = "Verification Code"  
-    password = "your_password".encode()  # Convert password to bytes
-    salt = bcrypt.gensalt()
-    hashed_password = bcrypt.hashpw(password, salt)
-    #send_email(subject, email, body)
-    code_details = {
-        'email': email,
-        'code': code,
-        'password' : hashed_password
-    }
-    function.update_file(code_details)    
-    return{'message': 'Check you email for the verification code and instruction'}
+    passwd = hashpw(password)
+    mail = send_email(subject, email, body)
+    if mail == True:
+        code_details = {
+            'email': email,
+            'code': code
+        }
+        codes = load_file()
+        codes.append(code_details)        
+        update_file(codes)  
+        string_pass = passwd.decode("utf-8")
+        user_details ={
+            'email': email,
+            'isActivated': False,
+            'password': string_pass, 
+            'phone_number': phone_number
+        }
+        users = load_users()        
+        users.append(user_details)
+        update_user(users)
+          
+        return JSONResponse(content={'message': 'Check you email for the verification code and instruction'})
+    else:         
+        raise HTTPException(status_code=400, detail="registeration failed")
+        
     
-@app.post('/code_validation')
+@app.post('/validate', response_model=Validate, status_code=201)
 def validate(email: EmailStr = Form(...), code: int = Form(...)):
-    codes = function.load_file()
+    codes = load_file()
     initial_length = len(codes)
-    new_codes = function.delete(codes, code, email)
+    new_codes = delete(codes, code, email)
     new_length = len(new_codes)
+    #print(new_codes)
     if initial_length == new_length:
-        return{'message': "code does not exist, registration not verified"}
+        return JSONResponse(content={'message': "code does not exist, registration not verified"})
     else:
-        function.update_file(new_codes)
-        return{'message': "registration verified"}
+        
+        update_file(new_codes)
+        users = load_users()
+        users = activate_user(email, users)
+        update_user(users)        
+        return JSONResponse(content={'message': "registration verified and User activated"})
+    # return JSONResponse(content={'message': 'workinh'})
 
 
 # 5. E-commerce Shopping Cart Management:
