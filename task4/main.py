@@ -1,10 +1,10 @@
 from typing import Annotated
-from fastapi import FastAPI, Form, Query, Depends,  UploadFile, File, HTTPException
+from fastapi import FastAPI, Form, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 import time
 import requests
-import json
+import random
 
 app = FastAPI()
 
@@ -12,6 +12,10 @@ class Parameters(BaseModel):
     number1: int
     number2: int
     operator: str
+
+class Name(BaseModel):
+    Firstname: str
+    Lastname: str
     
 
 #Calculator dependency
@@ -71,11 +75,17 @@ async def search(q: str):
             return "Error in network connection"
     return books   
 
-
+async def flag():
+    # Your list of two items
+    role = ["Admin", "user"]
+    # Select a random index from 0 (inclusive) to the length of the list minus 1 (exclusive)
+    random_index = random.randrange(len(role))
+    # Pick the item at the random index
+    return role[random_index]
 
 # 1. Dependency Injected Calculator API:
 # Create a simple calculator API where arithmetic operations (addition, subtraction, multiplication, division) are performed using dependency-injected functions.
-@app.post('/calculator/')
+@app.post('/calculator/', response_model=Parameters)
 async def calculate(result: Annotated[float | int | dict, Depends(operation)]):
     return JSONResponse(content={"result": result})
 
@@ -90,7 +100,13 @@ async def greet(time: Annotated[str, Depends(getTimeOfTheDay)]):
 
 # 3.Configurable Feature Flags API:
 # Build an API that uses feature flags to enable or disable features. Use dependencies to inject the current state of feature flags into your endpoints.
-
+@app.post('/info', response_model=Name)
+async def info(Firstname: Annotated[str, Form()], Lastname: Annotated[str, Form()], flag: Annotated[str, Depends(flag)]):
+    if flag == 'Admin':
+        return JSONResponse(content={'message' : f"{Firstname} {Lastname} you are logged in as an Admin"})
+    if flag == "user":
+        return JSONResponse(content={'message' : f"{Lastname} {Firstname} you are logged in as User"})
+        
  
 
  
