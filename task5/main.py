@@ -19,6 +19,7 @@ class User(BaseModel):
 class Todo(BaseModel):
     username: str
     password: str
+    is_complete: bool
  
 @app.middleware("http")
 async def authenticateUser(request: Request, call_next):
@@ -99,16 +100,35 @@ async def create(title: Annotated[str, Form()]):
     file_update.updatefile(path, f)
     return JSONResponse(content=f)
     
-@app.put('/todo')
-async def signIn():
+@app.put('/todo/:id')
+async def signIn(id: Annotated[int, id], title: Annotated[str | None, Form()], is_complete: Annotated[bool | None, Form()]):
+    path = "./todo/todo.json"
+    f = file_update.openfile(path)
+    for todo in f:
+        if todo["id"] == id:
+            if title:
+                todo["title"] = title
+            if is_complete:
+                todo["is_complete"] = is_complete
+            file_update.updatefile(path, f)
+            return JSONResponse(content={"list": f})
     return{
-        'sign' : 'update'
+        'error' : 'todo does not exist'
     }
 
-@app.delete('/todo')
-async def signIn():
+@app.delete('/todo/:id')
+async def signIn(id: Annotated[int, id]):
+    path = "./todo/todo.json"
+    f = file_update.openfile(path)
+    i = 0
+    for todo in f:
+        if todo["id"] == id:           
+            f.remove(i)
+            file_update.updatefile(path, f)
+            return JSONResponse(content={"list": f})
+        i = i + 1
     return{
-        'sign' : 'deleted'
+        'error' : 'todo does not exist'
     }
 
 # OAuth2 User Profile API:
