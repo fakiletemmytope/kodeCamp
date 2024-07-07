@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, Form
+from fastapi import FastAPI, HTTPException, Request, Form, Query
 from typing import Annotated
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -13,27 +13,38 @@ app = FastAPI()
 # Create a to-do list API where users can sign in with OAuth2. Use middleware to ensure only authenticated users can create, view, update, or delete tasks.
 
 class User(BaseModel):
+    First_name: str
+    Last_name: str
+    Email: str
     username: str
     password: str
     
 class Todo(BaseModel):
-    username: str
-    password: str
-    is_complete: bool
+    title: str | None = None
+    is_complete: bool | None = None
+
+class Note(BaseModel):
+    title: str
+    body: str
  
 @app.middleware("http")
 async def authenticateUser(request: Request, call_next):
     urlpath = request.url.path
-    if urlpath == "/createuser":
+    verb = request.method
+    print(verb, urlpath)
+    if urlpath == "/createuser" or urlpath == "/docs":
         response = await call_next(request)
         return response
-    elif urlpath == "/todo_login":
+    elif urlpath == "/todo_login" or urlpath == "/user_login":
+        response = await call_next(request)
+        return response
+    elif urlpath == "/user" and verb == "POST":
         response = await call_next(request)
         return response
     else:
         #print(request.headers["authorization"].split(" ")[1])
         if request.headers.get("authorization"):
-            decode_token = to_do_auth.authenticate_token(request.headers.get("authorization").split(" ")[1])            
+            to_do_auth.authenticate_token(request.headers.get("authorization").split(" ")[1])            
             response = await call_next(request)
             return response
         else:
@@ -87,21 +98,23 @@ async def view():
     
 @app.post('/todo',response_model=Todo)
 async def create(title: Annotated[str, Form()]):
-    path = './todo/todo.json'
-    f= file_update.openfile(path)
-    id = len(f) + 1
-    new_todo = {
-        "title": title,
-        "id": id,
-        "created_by": to_do_auth.current_user,
-        "is_complete": False
-    }
-    f.append(new_todo)
-    file_update.updatefile(path, f)
-    return JSONResponse(content=f)
+    if title:
+        path = './todo/todo.json'
+        f= file_update.openfile(path)
+        id = len(f) + 1
+        new_todo = {
+            "title": title,
+            "id": id,
+            "created_by": to_do_auth.current_user,
+            "is_complete": False
+        }
+        f.append(new_todo)
+        file_update.updatefile(path, f)
+        return JSONResponse(content=f)
+    return JSONResponse(content={"error message": "The title field must be filled"})
     
-@app.put('/todo/:id')
-async def signIn(id: Annotated[int, id], title: Annotated[str | None, Form()], is_complete: Annotated[bool | None, Form()]):
+@app.put('/todo/{id}', response_model=Todo)
+async def updateTodo(id: Annotated[int, id], title: Annotated[str | None, Form()] = None, is_complete: Annotated[bool , Form()]= None):
     path = "./todo/todo.json"
     f = file_update.openfile(path)
     for todo in f:
@@ -116,17 +129,17 @@ async def signIn(id: Annotated[int, id], title: Annotated[str | None, Form()], i
         'error' : 'todo does not exist'
     }
 
-@app.delete('/todo/:id')
-async def signIn(id: Annotated[int, id]):
+@app.delete('/todo/{id}')
+async def deleteTodo(id: Annotated[int, id]):
     path = "./todo/todo.json"
     f = file_update.openfile(path)
-    i = 0
+    # i = 0
     for todo in f:
-        if todo["id"] == id:           
-            f.remove(i)
+        if todo["id"] == id:         
+            f.remove(todo)
             file_update.updatefile(path, f)
             return JSONResponse(content={"list": f})
-        i = i + 1
+        # i = i + 1
     return{
         'error' : 'todo does not exist'
     }
@@ -134,13 +147,110 @@ async def signIn(id: Annotated[int, id]):
 # OAuth2 User Profile API:
 # Develop an API where users can sign in with OAuth2 and manage their profiles. Use middleware to protect profile endpoints and allow users to update their information securely.
 
- 
+@app.post('/user', response_model=User)
+async def registeration(last_name: Annotated[str, Form()], first_name: Annotated[str, Form()], username: Annotated[str, Form()], email: Annotated[str, Form()], password: Annotated[str, Form()]):
+    path =  "./user_profile/users.json"
+    f = file_update.openfile(path)
+    for key in f:
+        if key != "counter":
+            user = f.get(key).get("email")
+            print(user)
+            if key == username:
+                return JSONResponse(content={"error": "User already exist"})
+            if user == email:
+                return JSONResponse(content={"error": "Email already used"})
+    hash_password = to_do_auth.bcrypt.using(rounds=13).hash(password)
+    
+    if f.get("counter"):
+        f["counter"] = f.get("counter") + 1
+    else:
+        f["counter"] = 1
+    id = f["counter"]
+    new_user = {
+        "last_name":last_name,
+        "first_name":first_name,
+        "username":username,
+        "password": hash_password,
+        "email": email , 
+        "id":  id   
+    }
+    f[username] = new_user
+    f = file_update.updatefile(path, f)
+    list = ["last_name", "first_name", "username", "id", "email"]
+    serilized = file_update.serializer(list, new_user)
+    return JSONResponse(content={"mesaage": "user created succesfully", "user_details": serilized})
 
+@app.post("/user_login", response_model=User)
+async def login(username: Annotated[str, Form()], password: Annotated[str, Form()]):
+    path ="./user_profile/users.json"
+    f = file_update.openfile(path)
+    for key in f:
+        if key == username:
+            user_details = f[username]
+            check = to_do_auth.password_verification(password, user_details['password'])
+            if check is True:
+                token = to_do_auth.get_token(f[username])
+                return JSONResponse(content={"message": "login successful", "bearer_token": token})
+            else:
+                return JSONResponse(content={"error_message": "incorrect username or password"})    
+    return JSONResponse(content={"error_message": "incorrect username or password"})
+
+@app.put("/user")
+async def updateProfile(last_name:Annotated[str, Form()]= None, first_name: Annotated[str, Form()]= None):
+    path ="./user_profile/users.json"
+    f = file_update.openfile(path)
+    if  to_do_auth.current_user:
+        #user = f[to_do_auth.current_user]
+        if first_name: 
+            f[to_do_auth.current_user]["first_name"] = first_name
+        if last_name:
+            f[to_do_auth.current_user]["last_name"] =last_name
+        file_update.updatefile(path, f)
+        list = ["last_name", "first_name", "username", "id", "email"]
+        serialized = file_update.serializer(list, f[to_do_auth.current_user])
+        return JSONResponse(content={"updated": serialized})
+    return JSONResponse(content={"error": "Unauthorised user"}) 
+            
 # OAuth2 Secured Notes API:
 # Build a notes API with OAuth2 authentication. Use middleware to ensure that users can only access their own notes, providing a secure way to manage personal information.
-
- 
-
+@app.post("/note")
+async def createnote(title: Annotated[str, Form()], body: Annotated[str, Form()]):
+    path =  "./notes/notes.json"
+    f = file_update.openfile(path)
+    f[0] = f[0] + 1
+    user = to_do_auth.current_user
+    new_note = {
+        "id": f[0],
+        "title": title,
+        "body": body,
+        "created_by": user        
+    }
+    f.append(new_note)
+    file_update.updatefile(path, f)
+    return JSONResponse(content={"note_craeted": new_note})
+    
+@app.get("/note")
+async def current_user_note():
+    path =  "./notes/notes.json"
+    notes = file_update.openfile(path)
+    user_note = []
+    for note in notes:
+        if note != notes[0]:
+            if note["created_by"] == to_do_auth.current_user:
+                user_note.append(note)
+    return JSONResponse(content={"list": user_note})
+            
+@app.get("/note/{id}") 
+async def get_one_note(id: Annotated[int, id]):
+    path =  "./notes/notes.json"
+    notes = file_update.openfile(path)
+    for note in notes:
+        if note != notes[0]:
+            if note["created_by"] == to_do_auth.current_user:
+                if note["id"] == id:                  
+                    return JSONResponse(content={"list": note})
+    return JSONResponse(content={"error": "note not found"})
+    
 # OAuth2 Protected Blog API:
 # Create a blog API where users can log in with OAuth2 to create, edit, and delete blog posts. Use middleware to restrict actions to authenticated users only.
 
