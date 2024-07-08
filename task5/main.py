@@ -5,12 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from passlib.hash import bcrypt
 from functions import file_update, to_do_auth
-
 app = FastAPI()
-
-#auth = OAuth2PasswordBearer
-# OAuth2 Secured To-Do List API:
-# Create a to-do list API where users can sign in with OAuth2. Use middleware to ensure only authenticated users can create, view, update, or delete tasks.
 
 class User(BaseModel):
     First_name: str
@@ -26,7 +21,12 @@ class Todo(BaseModel):
 class Note(BaseModel):
     title: str
     body: str
- 
+
+class Blog(BaseModel):
+    title: str
+    body: str
+    is_published: bool | None = None
+    
 @app.middleware("http")
 async def authenticateUser(request: Request, call_next):
     urlpath = request.url.path
@@ -49,7 +49,11 @@ async def authenticateUser(request: Request, call_next):
             return response
         else:
             return JSONResponse(content={"detail":"Unauthorized user"})
-        
+
+#auth = OAuth2PasswordBearer
+# OAuth2 Secured To-Do List API:
+# Create a to-do list API where users can sign in with OAuth2. Use middleware to ensure only authenticated users can create, view, update, or delete tasks.
+     
 @app.post('/createuser', response_model=User)
 async def createUser(username: Annotated[str, Form()], password: Annotated[str, Form()]):
     path ="./todo/users.json"
@@ -121,7 +125,7 @@ async def updateTodo(id: Annotated[int, id], title: Annotated[str | None, Form()
         if todo["id"] == id:
             if title:
                 todo["title"] = title
-            if is_complete:
+            if is_complete is not None:
                 todo["is_complete"] = is_complete
             file_update.updatefile(path, f)
             return JSONResponse(content={"list": f})
@@ -213,7 +217,7 @@ async def updateProfile(last_name:Annotated[str, Form()]= None, first_name: Anno
             
 # OAuth2 Secured Notes API:
 # Build a notes API with OAuth2 authentication. Use middleware to ensure that users can only access their own notes, providing a secure way to manage personal information.
-@app.post("/note")
+@app.post("/note", response_model=Note)
 async def createnote(title: Annotated[str, Form()], body: Annotated[str, Form()]):
     path =  "./notes/notes.json"
     f = file_update.openfile(path)
@@ -229,7 +233,7 @@ async def createnote(title: Annotated[str, Form()], body: Annotated[str, Form()]
     file_update.updatefile(path, f)
     return JSONResponse(content={"note_craeted": new_note})
     
-@app.get("/note")
+@app.get("/note", response_model=Note)
 async def current_user_note():
     path =  "./notes/notes.json"
     notes = file_update.openfile(path)
@@ -240,7 +244,7 @@ async def current_user_note():
                 user_note.append(note)
     return JSONResponse(content={"list": user_note})
             
-@app.get("/note/{id}") 
+@app.get("/note/{id}", response_model=Note) 
 async def get_one_note(id: Annotated[int, id]):
     path =  "./notes/notes.json"
     notes = file_update.openfile(path)
@@ -253,8 +257,93 @@ async def get_one_note(id: Annotated[int, id]):
     
 # OAuth2 Protected Blog API:
 # Create a blog API where users can log in with OAuth2 to create, edit, and delete blog posts. Use middleware to restrict actions to authenticated users only.
+@app.post("/blog", response_model=Blog)
+async def createblog(title: Annotated[str, Form()], body: Annotated[str, Form()]):
+    path =  "./blogs/blogs.json"
+    f = file_update.openfile(path)
+    f[0] = f[0] + 1
+    user = to_do_auth.current_user
+    new_blog = {
+        "id": f[0],
+        "title": title,
+        "body": body,
+        "created_by": user,
+        "is_published": False    
+    }
+    f.append(new_blog)
+    file_update.updatefile(path, f)
+    return JSONResponse(content={"blog_craeted": new_blog})
+    
+@app.get("/blog")
+async def current_user_blog():
+    path =  "./blogs/blogs.json"
+    blogs = file_update.openfile(path)
+    user_blog = []
+    for blog in blogs:
+        if blog != blogs[0]:
+            if blog["created_by"] == to_do_auth.current_user:
+                user_blog.append(blog)
+                return JSONResponse(content={"list": user_blog})
+    return JSONResponse(content={"message": "No blog post"})
+            
+@app.get("/blog/{id}") 
+async def get_one_blog(id: Annotated[int, id]):
+    path =  "./blogs/blogs.json"
+    blogs = file_update.openfile(path)
+    for blog in blogs:
+        if blog != blogs[0]:
+            if blog["created_by"] == to_do_auth.current_user:
+                if blog["id"] == id:                  
+                    return JSONResponse(content={"list": blog})
+    return JSONResponse(content={"error": "blog not found"})
 
- 
+@app.put("/blog/{id}", response_model=Blog)
+async def update_blog(id: Annotated[int, id], title: Annotated[str, Form()] = None, body: Annotated[str, Form()] =None, is_published: Annotated[bool, Form()] =None  ):
+    path =  "./blogs/blogs.json"
+    blogs = file_update.openfile(path)
+    print(is_published)
+    for blog in blogs:
+        #print(blog)
+        if blog != blogs[0]:
+            
+            if blog["created_by"] == to_do_auth.current_user:
+                if blog["id"] == id: 
+                    print(blog)
+                    if title:
+                        print(blog)
+                        blog["title"] = title
+                    if body:
+                        print(blog)
+                        blog["body"] = body
+                    if is_published is not None:
+                        print(blog)
+                        blog["is_published"] = is_published
+                        file_update.updatefile(path, blogs)
+                        return JSONResponse(content={"updated_blog": blog})
+    return JSONResponse(content={"error": "blog not found"})                 
+
+@app.delete("/blog/{id}")
+async def delete_blog():
+    path =  "./blogs/blogs.json"
+    blogs = file_update.openfile(path)
+    for blog in blogs:
+        if blog != blogs[0]:
+            if blog["created_by"] == to_do_auth.current_user:
+                if blog["id"] == id: 
+                    blog.remove(blog)                 
+                    return JSONResponse(content={"message": "blog post deleted"})
+    return JSONResponse(content={"error": "blog not found"})
 
 # OAuth2 E-commerce API:
 # Develop an e-commerce API with OAuth2 for user authentication. Implement middleware to protect user actions like viewing order history, placing orders, and managing account details.
+
+@app. get("/history")
+async def history():
+    path =  "./e-commerce/history.json"
+    histories = file_update.openfile(path)
+    for history in histories:
+        if history != histories[0]:
+            if history["userId"] == to_do_auth.current_user:
+                return JSONResponse(content={"histroy": history})
+                
+    return JSONResponse(content={"message": "User has no purchase histroy"}) 
