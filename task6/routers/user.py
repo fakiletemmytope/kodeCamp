@@ -6,7 +6,7 @@ from passlib.hash import bcrypt
 from database.db_connect import Session
 from database.models import User
 from utils import authenticate
-from sqlalchemy.exc import SQLAlchemyError 
+from sqlalchemy.exc import SQLAlchemyError, NoResultFound
 
 # User Authentication and Authorization API:
 # Build an API that handles user registration, login, and role-based access control. Store user credentials, roles, and permissions in an SQLite database.
@@ -14,7 +14,6 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
     tags=["users"]
 )
-
 
 class UserForm(BaseModel):
     first_name: str
@@ -62,28 +61,35 @@ async def create_user(first_name:Annotated[str, Form()], last_name:Annotated[str
             status_code=500  # HTTP status code for server error
         )
     
-
 @router.post("/login")
 async def login(email:Annotated[str, Form()], password:Annotated[str, Form()]):
     session = Session()
-    result = session.query(User).where(User.email == email).one()
-    #print(result.hashed_password)
-    if authenticate.password_verification(password, result.hashed_password):
-        payload = {
-            "id": result.id,
-            "username": f'{result.first_name} {result.last_name}'
-        }  
-        token = authenticate.get_token(payload) 
-        session.close()  
-        return JSONResponse(content={
-            "message": "successfully logged in",
-            "token": token
-        }, status_code=200)   
-  
-    session.close()
-    return JSONResponse(content=({
-        "details":  "Incorrect User login"
-    }), status_code=403)
+    try:
+        result = session.query(User).where(User.email == email).one()
+        if result:
+            #print(result.hashed_password)
+            if authenticate.password_verification(password, result.hashed_password):
+                payload = {
+                    "id": result.id,
+                    "username": f'{result.first_name} {result.last_name}'
+                }  
+                token = authenticate.get_token(payload) 
+                session.close()  
+                return JSONResponse(content={
+                    "message": "successfully logged in",
+                    "token": token
+                }, status_code=200)   
+            else:
+                session.close()
+                return JSONResponse(content=({
+                    "details":  "Incorrect User login details"
+                }), status_code=403)    
+    except NoResultFound as e:
+        session.close()
+        return JSONResponse(content=({
+            "details":  "User does not exists"
+        }), status_code=403)
+    
 
 #user with the is_admin == false can only update his/her first and last name | user with is_admin can update any user's firstname, lastname and role
 @router.put("/user")

@@ -15,16 +15,13 @@ class User(Base):
 
     # blogs = relationship("Item", back_populates="owner")
     
-    
-
 class Blog(Base):
     __tablename__ = "blogs"
 
     id = Column(Integer, primary_key=True)
-    title = Column(String, index=True)
-    body = Column(String, index=True)
-    author_name = Column(String, index=True)
-    author_id = Column(Integer, index= True)
-    
-    
+    title = Column(String)
+    body = Column(String)
+    author_name = Column(String)
+    author_id = Column(Integer)
+      
 Base.metadata.create_all(bind=engine)

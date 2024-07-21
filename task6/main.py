@@ -22,9 +22,15 @@ async def authenticateUser(request: Request, call_next):
         return response
     else:
         if request.headers.get("authorization"):
-            if authenticate.authenticate_token(request.headers.get("authorization").split(" ")[1]) is None:
+            decode = await authenticate.authenticate_token(request.headers.get("authorization").split(" ")[1])
+            print(decode)
+            if  decode is None:
                 return JSONResponse(content={"detail":"Expired Token"}) 
-            else:       
+            else:   
+                current_username = decode["username"]   
+                current_userId = decode["id"]  
+                request.state.custom_data = {"current_username": current_username,
+                                             "current_userId": current_userId} 
                 response = await call_next(request)
                 return response
         else:

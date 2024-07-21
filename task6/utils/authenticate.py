@@ -15,17 +15,23 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 10
 
 current_user = None
+
 def get_token(payload):
     expiration_time = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload["exp"] =  expiration_time
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def authenticate_token(token):
+async def authenticate_token(token):
     global current_user
-    try:        
-        current_user = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-        return current_user
+    try:    
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)    
+        current_user = {
+            "current_username": decoded["username"],
+            "current_userId": decoded["id"]
+        }
+        # print(current_user)
+        return decoded
     except ExpiredSignatureError:
         print("Token has expired.")
         return None
