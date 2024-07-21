@@ -39,5 +39,5 @@ async def authenticate_token(token):
         print("Invalid token.")
         return None
 
-def hash_passwd(password):
+def hash_password(password):
     return bcrypt.using(rounds=13).hash(password)
