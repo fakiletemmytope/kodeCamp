@@ -12,7 +12,7 @@ def password_verification(password, hash):
 
 SECRET_KEY = "e434573e0c4a5f0ebb67d41df3a2b400ae315b38ef74279614e33403dd17a04a"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 10
+ACCESS_TOKEN_EXPIRE_MINUTES = 25
 
 current_user = None
 
@@ -38,3 +38,6 @@ async def authenticate_token(token):
     except InvalidTokenError:
         print("Invalid token.")
         return None
+
+def hash_passwd(password):
+    return bcrypt.using(rounds=13).hash(password)

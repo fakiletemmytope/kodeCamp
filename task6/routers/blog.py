@@ -31,7 +31,7 @@ async def all_blogs(request: Request):
         session = Session()
         result = session.query(Blog).where(Blog.author_id == id).all()
         print(result)
-        param = ["title", "body"]
+        param = ["title", "body", "author_name"]
         if result:  
             list = []
             for row in result:
@@ -68,7 +68,7 @@ async def blog(blog_id: int, request: Request):
     try:        
         session = Session()
         result = session.query(Blog).where(Blog.author_id == id, Blog.id == blog_id).one()
-        param = ["title", "body"]
+        param = ["title", "body", "author_name"]
         if result:     
             serialized = await serialize(param, result)       
             return JSONResponse(content={
